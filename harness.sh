@@ -4,6 +4,10 @@ CWD="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 OLLAMA_HOST=${OLLAMA_HOST:-"http://localhost:11434"}
 
+SYS='You are a terse coding assistant. Answer only what was asked.
+- No greetings, no preamble, no restating the question, no closing summary.
+- Prose: max 3 short sentences. Use a list only if the answer is genuinely a list.'
+
 MODEL=
 select_model() {
   local models=()
@@ -28,10 +32,19 @@ send_message() {
   local prompt=$1
   jq -nc \
     --arg model "$MODEL" \
+    --arg sys "$SYS" \
     --arg prompt "$prompt" \
-    '{model:$model, stream:false, messages:[{role:"user",content:$prompt}]}' |
-    curl -sf "$OLLAMA_HOST/api/chat" -d @- |
-    jq -r '.message.content // empty'
+    '{
+      model:$model,
+      stream:true,
+      messages:[
+        {role:"user",content:$prompt},
+        {role:"system",content:$sys}
+      ],
+      options:{temperature:0.3,num_predict:400}
+    }' |
+    curl -sfN "$OLLAMA_HOST/api/chat" -d @- |
+    jq --unbuffered -j '.message.content // empty'
 }
 
 SESSION="bash-harness-$(date +%s)"
@@ -47,11 +60,13 @@ while true; do
 
   tmp=$(mktemp)
 
-  CONTEXT=$(tail -1000 "$SESSION_DIR/chat.txt")
+  CONTEXT=$(tail -100 "$SESSION_DIR/chat.txt")
   FULL_PROMPT=$(printf '%s\nUser: %s' "$CONTEXT" "$USER_PROMPT")
 
-  printf 'Agent: '
+  printf '%s' 'Agent: '
   send_message "$FULL_PROMPT" | tee "$tmp"
+  printf '\n'
+
 
   RES=$(cat "$tmp")
 
