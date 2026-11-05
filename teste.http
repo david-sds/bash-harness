@@ -1,0 +1,81 @@
+@host = http://localhost:11434
+@model = deepseek-coder-v2:16b
+
+# ollama:11434 only resolves from the host if you either
+#   - publish the port in compose.yaml:  ports: ["127.0.0.1:11434:11434"]
+#     and add:  127.0.0.1 ollama    to /etc/hosts
+#   - or swap the line above for http://127.0.0.1:11434 (published port),
+#     or http://<container-ip>:11434 (docker inspect ollama)
+# Non-streaming requests can take minutes on CPU: raise the client timeout.
+
+### list models
+GET {{host}}/api/tags
+
+### running models
+GET {{host}}/api/ps
+
+### model info
+POST {{host}}/api/show
+Content-Type: application/json
+
+{
+  "model": "{{model}}"
+}
+
+### generate (one-shot)
+POST {{host}}/api/generate
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "prompt": "Reply with exactly: pong",
+  "stream": false,
+  "options": { "num_ctx": 4096 }
+}
+
+### chat (non-streaming)
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "stream": false,
+  "messages": [
+    { "role": "system", "content": "You are terse." },
+    { "role": "user", "content": "Say hi in five words." }
+  ],
+  "options": { "num_ctx": 4096, "temperature": 0.7 }
+}
+
+### count (non-streaming)
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "stream": false,
+  "messages": [
+    { "role": "user", "content": "Count from 1 to 5." }
+  ]
+}
+
+### count (streaming)
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{
+  "model": "{{model}}",
+  "stream": true,
+  "messages": [
+    { "role": "user", "content": "Count from 1 to 5." }
+  ]
+}
+
+### pull a model
+POST {{host}}/api/pull
+Content-Type: application/json
+
+{
+  "model": "gpt-oss:20b",
+  "stream": false
+}
